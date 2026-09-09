@@ -23,7 +23,7 @@ def describe_activity(image):
     prompt = (
         "Describe the activity of the main person or vehicle "
         "in this image in one short sentence. "
-        "Focus on the action, not appearance. "
+        "Focus on the action and object color, not appearance. "
         "If the activity is uncertain, say so."
     )
 
@@ -100,7 +100,7 @@ def read_video_get_caption():
     if not video.isOpened():
         raise RuntimeError(f"Could not open video: {VIDEO_PATH}")
 
-    frame_count = int(cv2.CAP_PROP_FRAME_COUNT)
+    # frame_count = int(cv2.CAP_PROP_FRAME_COUNT)
     frame_id = 0
 
     while True:
@@ -186,15 +186,15 @@ def main():
     read_video_get_caption()
 
 if __name__ == "__main__":
-    config = yaml.load(open("config.yaml"), Loader=yaml.FullLoader)
+    config = yaml.load(open("config/config.yaml"), Loader=yaml.FullLoader)
     MAX_NEW_TOKENS = config["VLM"]["max_new_tokens"]
     YOLO_MODEL = config["YOLO"]["detection_model"]
     VIDEO_PATH = config["video_path"]
-    CONFIDENCE = config["yolo"]["confidence"]
+    CONFIDENCE = config["YOLO"]["confidence"]
     USE_TENSORRT = True
     if USE_TENSORRT:
         YOLO_MODEL = YOLO_MODEL.replace(".pt", ".engine")
-    QWEN_MODEL = config["QWEN"]["model"]
+    QWEN_MODEL = config["VLM"]["model"]
 
     yolo, qwen, processor = load_models(YOLO_MODEL,QWEN_MODEL)
     main()
