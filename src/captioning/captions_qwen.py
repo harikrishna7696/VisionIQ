@@ -4,16 +4,17 @@ from qwen_vl_utils import process_vision_info
 import torch
 
 class Qwen_Model:
-    def __init__(self, qwen_model):
+    def __init__(self, qwen_model,max_tokens):
         self.qwen_model = qwen_model
         self.qwen, self.processor = self.load_qwen_model()
+        self.max_tokens = max_tokens
 
     def load_qwen_model(self):
         qwen_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                          bnb_4bit_compute_dtype=torch.float16,
                                          bnb_4bit_use_double_quant=True)
         qwen = Qwen2_5_VLForConditionalGeneration.from_pretrained(self.qwen_model, quantization_config=qwen_config)
-        processor = AutoProcessor.from_pretrained(QWEN_MODEL)
+        processor = AutoProcessor.from_pretrained(self.qwen_model)
         return qwen, processor
 
     def caption(self, image):
@@ -69,7 +70,7 @@ class Qwen_Model:
         with torch.inference_mode():
             generated_ids = self.qwen.generate(
                 **inputs,
-                max_new_tokens=MAX_NEW_TOKENS,
+                max_new_tokens=self.max_tokens,
                 do_sample=False,
             )
 
