@@ -21,6 +21,7 @@ from pathlib import Path
 import streamlit as st
 
 from utils import Config
+from vector_db import LanceDB
 from src.detection.yolo_infer import YOLOInfer
 
 
@@ -90,6 +91,12 @@ def validate_video_path(video_path: str) -> tuple[bool, str]:
 
     return True, "Video path is valid."
 
+def is_valid_prompt(prompt_text: str):
+    if not prompt_text.strip():
+        return False, "Please enter a valid prompt text."
+    elif len(prompt_text.strip()) < 4:
+        return False, "Please enter a prompt > 4 words."
+    return True, "Prompt text is valid."
 
 @st.cache_resource
 def load_yolo_model() -> YOLOInfer:
@@ -103,14 +110,10 @@ def load_yolo_model() -> YOLOInfer:
     Returns:
         Initialized YOLOInfer instance.
     """
-    return YOLOInfer(
-        Config.YOLO_MODEL,
-        Config.USE_TENSORRT,
-        Config.CONFIDENCE,
-    )
 
 
-def run_inference(video_path: str) -> None:
+
+def run_inference(video_path: str, prompt_text: str) -> None:
     """
     Run YOLO inference on the supplied video.
 
@@ -123,12 +126,25 @@ def run_inference(video_path: str) -> None:
     """
     try:
         with st.spinner("Running YOLO inference..."):
-            yolo = load_yolo_model()
+            yolo = YOLOInfer(
+                            Config.YOLO_MODEL,
+                            Config.USE_TENSORRT,
+                            Config.CONFIDENCE,
+                        )
         with st.spinner("Processing video..."):
-            yolo.read_video_get_detections(video_path, st)
+            yolo.read_video_get_detections(video_path, st, prompt_text)
+        st.success("Video inference completed successfully. saved image and text embedding to VectorDB")
 
-        st.success("Video inference completed successfully.")
-
+        input_prompt = st.text_input(
+            label=f"Describe what you are searching from given video",
+            help=f"Describe what you are searching from given video. ",
+            value="is any person wearing a hat"
+        )
+        if input_prompt is None:
+            st.info("Enter a prompt")
+        else:
+            img, caption = yolo.fetch_frames_match_to_prompt_text(input_prompt, st)
+            st.image(img, caption=caption)
     except Exception as exc:
         st.error("An error occurred while processing the video.")
         st.exception(exc)
@@ -141,24 +157,44 @@ def run_inference(video_path: str) -> None:
 video_path = st.text_input(
     label=f"Enter video path ({SUPPORTED_VIDEO_FORMATS_TEXT})",
     placeholder="/path/to/video.mp4",
+    value="/home/hari/Videos/vlc-record-2026-09-13-16h02m26s-vlc-record-2026-09-11-22h54m38s-6655746-hd_1920_1080_30fps.mp4-.mp4-.mp4",
     help=(
         "Enter the path to a local video file. "
         "Supported formats: MP4, AVI, MKV."
     ),
 )
+prompt_text = st.text_input(
+    label=f"Enter prompt text",
+    placeholder="Enter prompt text",
+    value="Describe the action, appearance, etc.",
+    help=(
+    "Ex: Describe the activity of the main person or vehicle "
+    "in this image in one short sentence. "
+    "Focus on the action and object color, not appearance. "
+    "If the activity is uncertain, say so."
+    )
+)
 
-if not video_path.strip():
-    st.info("Please enter a valid video file path.")
+try:
+    if not video_path.strip():
+        st.info("Please enter a valid video file path.")
 
-else:
-    is_valid, message = validate_video_path(video_path)
-
-    if not is_valid:
-        st.warning(message)
     else:
-        st.success(message)
+        is_valid, message = validate_video_path(video_path)
+        is_text_valid, tex_message = is_valid_prompt(prompt_text)
 
-        # Normalize whitespace before passing the path to inference.
-        normalized_video_path = video_path.strip()
+        if video_path is None or prompt_text is None:
+            st.warning("Please enter a valid video file path.")
+        if not is_text_valid:
+            st.warning(tex_message)
+        elif not is_valid:
+            st.warning(message)
+        else:
+            st.success(message)
 
-        run_inference(normalized_video_path)
+            # Normalize whitespace before passing the path to inference.
+            normalized_video_path = video_path.strip()
+
+            run_inference(normalized_video_path, prompt_text)
+except KeyboardInterrupt as e:
+    exit()
