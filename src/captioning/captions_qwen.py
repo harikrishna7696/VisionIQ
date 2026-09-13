@@ -17,18 +17,10 @@ class Qwen_Model:
         processor = AutoProcessor.from_pretrained(self.qwen_model)
         return qwen, processor
 
-    def caption(self, image):
+    def caption(self, image, prompt: tuple[str]):
         """
             Ask Qwen to describe the activity in an image.
             """
-
-        prompt = (
-            "Describe the activity of the main person or vehicle "
-            "in this image in one short sentence. "
-            "Focus on the action and object color, not appearance. "
-            "If the activity is uncertain, say so."
-        )
-
         messages = [
             {
                 "role": "user",
