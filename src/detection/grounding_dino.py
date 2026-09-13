@@ -1,35 +1,45 @@
-
 import torch
-from PIL import Image, ImageDraw
+from PIL import ImageDraw
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 
-model_id = "IDEA-Research/grounding-dino-tiny"
+class GroundingDino:
+    def __init__(self, model_id: str):
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id, device_map="auto")
 
-processor = AutoProcessor.from_pretrained(model_id)
-model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id, device_map="auto")
+    def detect(self, image, caption):
+        if not isinstance(caption, str) or not caption.strip():
+            raise ValueError(
+                "Grounding DINO requires a non-empty text caption; "
+                f"received {type(caption).__name__}."
+            )
 
-image_url = "/home/hari/Downloads/pexels-kolkatarchobiwala-18414576.jpg"
-image = Image.open(image_url)
-# Check for cats and remote controls
-text_labels = [["persons holding a banner"]]
+        # The tokenizer accepts a string or a flat list of strings. A nested
+        # list such as [[caption]] is only suitable as post-processing label
+        # metadata and causes TextEncodeInput errors during tokenization.
+        text_prompt = caption.strip()
 
-inputs = processor(images=image, text=text_labels, return_tensors="pt").to(model.device)
-with torch.no_grad():
-    outputs = model(**inputs)
+        inputs = self.processor(
+            images=image,
+            text=text_prompt,
+            return_tensors="pt",
+        ).to(self.model.device)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
 
-results = processor.post_process_grounded_object_detection(
-    outputs,
-    inputs.input_ids,
-    threshold=0.4,
-    text_threshold=0.3,
-    target_sizes=[image.size[::-1]]
-)
+        results = self.processor.post_process_grounded_object_detection(
+            outputs,
+            inputs.input_ids,
+            threshold=0.4,
+            text_threshold=0.3,
+            target_sizes=[image.size[::-1]]
+        )
 
-# Retrieve the first image result
-result = results[0]
-for box, score, labels in zip(result["boxes"], result["scores"], result["labels"]):
-    box = [int(x) for x in box.tolist()]
-    draw = ImageDraw.Draw(image)
-    draw.rectangle(box, outline="red")
-    print(f"Detected {labels} with confidence {round(score.item(), 3)} at location {box}")
-image.show()
+        # Retrieve the first image result
+        result = results[0]
+        draw = ImageDraw.Draw(image)
+        for box, score, labels in zip(result["boxes"], result["scores"], result["labels"]):
+            box = [int(x) for x in box.tolist()]
+            draw.rectangle(box, outline="red")
+            print(f"Detected {labels} with confidence {round(score.item(), 3)} at location {box}")
+        return image
