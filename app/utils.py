@@ -14,6 +14,7 @@ class Config:
     QWEN_MODEL = config["VLM"]["model"]
     CLIP_MODELS = config["EMBEDDING"]["model"]
     GROUNDING_DINO = config["GROUNDING_DINO"]["model"]
+    QWEN_REASONING = config["REASONING_MODEL"]["model"]
 
 
 class RedisManager:
